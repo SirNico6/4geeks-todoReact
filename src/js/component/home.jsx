@@ -1,22 +1,87 @@
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../../styles/index.css"
 
-//create your first component
 const Home = () => {
 	const [taskList, setTaskList] = useState([]);
 	const [inputValue, setInputValue] = useState("");
+	const baseURL = "https://playground.4geeks.com/todo/";
+	const myUser = "nicoarevalo3";
 
-	const addTask = (e) => {
+	useEffect(() => {
+		createUser();
+	}, []);
+
+	const createUser = async () => {
+		try {
+			const response = await fetch(baseURL + "users/" + myUser, { method: 'POST' });
+			if (!response.ok) {
+				if (response.status === 400) {
+					console.log("user already exist, executing get tasks!")
+					getTasks();
+					return;
+				} else {
+					alert("Something went wrong, try again later");
+				}
+			}
+		} catch (error) {
+			console.error("Error creating user:", error);
+		}
+	}
+
+
+	const addTask = async (e) => {
 		if (e.key === 'Enter' && inputValue.trim() !== "") {
-			setTaskList([...taskList, inputValue]); // Agregar la nueva tarea al array
-			setInputValue(""); // Limpiar el input
+			await fetch(baseURL + "todos/" + myUser, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					"label": inputValue,
+					"is_done": false
+				})
+			})
+				.then(response => {
+					getTasks();
+					return response.json()
+				})
+				.catch(error => {
+					console.error(error)
+				});
+			setInputValue("");
 		}
 	};
 
-	const deleteTask = (index) => {
-		// Elimina la tarea del taskList
-		setTaskList(taskList.filter((_, i) => i !== index));
+	const getTasks = async () => {
+		setTaskList([]);
+		await fetch(baseURL + "users/" + myUser, { method: 'GET' })
+			.then(response => {
+				if (response.status == 404) {
+					createUser();
+				}
+				return response.json()
+			})
+			.then(data => {
+				data.todos.forEach(element => {
+					setTaskList(prevTaskList => [...prevTaskList, element]);
+				});
+			})
+			.catch(error => {
+				if (response.status == 404) {
+					createUser();
+				} else {
+					console.error(error);
+				}
+			});
+	}
+
+	const deleteTask = async (task) => {
+		await fetch(baseURL + "todos/" + task.id, { method: 'DELETE' })
+			.then(response => {
+				getTasks();
+			})
+			.catch(error => console.error(error));
 	};
 
 	return (
@@ -33,10 +98,10 @@ const Home = () => {
 			{taskList.length > 0 ? (
 				<>
 					<ul className="list-group w-25 taskList">
-						{taskList.map((task, index) => (
-							<li className="list-group-item d-flex justify-content-between align-items-center" key={index} style={{ border: 'none', borderBottom: '1px solid #e0e0e0' }}>
-								<span>{task}</span>
-								<button type="button" className="btn-close" aria-label="Close" onClick={() => deleteTask(index)}></button>
+						{taskList.map((task) => (
+							<li className="list-group-item d-flex justify-content-between align-items-center" key={task.id} style={{ border: 'none', borderBottom: '1px solid #e0e0e0' }}>
+								<span>{task.label}</span>
+								<button type="button" className="btn-close" aria-label="Close" onClick={() => deleteTask(task)}></button>
 							</li>
 						))}
 					</ul>
